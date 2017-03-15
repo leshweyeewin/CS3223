@@ -64,7 +64,7 @@ private static Random random;
 		int size = Integer.parseInt(line);
 		//outstat.print(size);
 		//outstat.println();
-
+ 
 
 	    /** Capture information about data types, range and primary/foreign keys**/
 	    /** format is <colname><coltype><keytype><attrsize><range>  **/
