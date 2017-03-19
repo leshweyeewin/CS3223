@@ -8,7 +8,7 @@ import qp.operators.*;
 import java.lang.Math;
 import java.util.Vector;
 
-public class RandomOptimizer{
+public class RandomOptimizer2{
 
 	/** enumeration of different ways to find the neighbor plan **/
 
@@ -28,7 +28,7 @@ public class RandomOptimizer{
 
 	/** constructor **/
 
-    public RandomOptimizer(SQLQuery sqlquery){
+    public RandomOptimizer2(SQLQuery sqlquery){
 	this.sqlquery = sqlquery;
     }
 
