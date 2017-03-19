@@ -7,6 +7,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.ArrayList;
+
 import qp.utils.Attribute;
 import qp.utils.Batch;
 import qp.utils.Tuple;
@@ -19,7 +21,7 @@ public class BlockNestedLoop extends Join{
      ** the NestedJoin operation
      **/
     int leftindex;     // Index of the join attribute in left table
-    int rightindex;    // Index of the join attribute in right tabless
+    int rightindex;    // Index of the join attribute in right table
 
     String rfname;    // The file name where the right table is materialize
 
@@ -135,7 +137,10 @@ public class BlockNestedLoop extends Join{
 	    for(int index = 0; index < numBuff-2; index++)
 	    {
 	    	leftbatch =(Batch) left.next();
+	    	
 	    	block[index] = leftbatch;
+	    	if(leftbatch == null)
+	    		break;
 	    }
 		
 		if(block[0]==null){
@@ -167,7 +172,7 @@ public class BlockNestedLoop extends Join{
 		    {
 		    	leftbatch = block[blockIndex];
 		    	if(leftbatch == null)
-		    		continue;
+		    		break;
 		    	 for(i=lcurs;i<leftbatch.size();i++){
 		 			for(j=rcurs;j<rightbatch.size();j++){
 		 			    Tuple lefttuple = leftbatch.elementAt(i);
