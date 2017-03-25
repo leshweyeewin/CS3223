@@ -35,6 +35,7 @@ public class BlockNestedLoop extends Join{
 
     int lcurs;    // Cursor for left side buffer
     int rcurs;    // Cursor for right side buffer
+    int pcurs; // page index of the block
     boolean eosl;  // Whether end of stream (left table) is reached
     boolean eosr;  // End of stream (right table)
 
@@ -130,100 +131,136 @@ public class BlockNestedLoop extends Join{
 	outbatch = new Batch(batchsize);
 
 
-	while(!outbatch.isFull()){
-
-	    if(lcurs==0 && eosr==true){
-		/** new left page is to be fetched**/
-	    for(int index = 0; index < numBuff-2; index++)
+	while(!outbatch.isFull())
+	{
+		//pcurs points to block index
+	    if(pcurs==0 && eosr==true)
 	    {
-	    	leftbatch =(Batch) left.next();
-	    	
-	    	block[index] = leftbatch;
-	    	if(leftbatch == null)
-	    		break;
-	    }
-		
-		if(block[0]==null){
-		    eosl=true;
-		    return outbatch;
-		}
-		/** Whenver a new left page came , we have to start the
-		 ** scanning of right table
-		 **/
-		try{
-
-		    in = new ObjectInputStream(new FileInputStream(rfname));
-		    eosr=false;
-		}catch(IOException io){
-		    System.err.println("BlockJoin:error in reading the file");
-		    System.exit(1);
-		}
-
-	    }
-
-	    while(eosr==false){
-
-		try{
-		    if(rcurs==0 && lcurs==0){
-			rightbatch = (Batch) in.readObject();
-		    }
-		    
-		    for(int blockIndex = 0; blockIndex < (numBuff-2); blockIndex++)
+			/** new left block is to be fetched**/
+		    for(int index = 0; index < numBuff-2; index++)
 		    {
-		    	leftbatch = block[blockIndex];
+		    	leftbatch =(Batch) left.next();
+		    	
+		    	block[index] = leftbatch;
 		    	if(leftbatch == null)
 		    		break;
-		    	 for(i=lcurs;i<leftbatch.size();i++){
-		 			for(j=rcurs;j<rightbatch.size();j++){
-		 			    Tuple lefttuple = leftbatch.elementAt(i);
-		 			    Tuple righttuple = rightbatch.elementAt(j);
-		 			    if(lefttuple.checkJoin(righttuple,leftindex,rightindex)){
-		 				Tuple outtuple = lefttuple.joinWith(righttuple);
-
-		 				//Debug.PPrint(outtuple);
-		 				//System.out.println();
-		 				outbatch.add(outtuple);
-		 				if(outbatch.isFull()){
-		 				    if(i==leftbatch.size()-1 && j==rightbatch.size()-1){//case 1
-		 					lcurs=0;
-		 					rcurs=0;
-		 				    }else if(i!=leftbatch.size()-1 && j==rightbatch.size()-1){//case 2
-		 					lcurs = i+1;
-		 					rcurs = 0;
-		 				    }else if(i==leftbatch.size()-1 && j!=rightbatch.size()-1){//case 3
-		 					lcurs = i;
-		 					rcurs = j+1;
-		 				    }else{
-		 					lcurs = i;
-		 					rcurs =j+1;
-		 				    }
-		 				    return outbatch;
-		 				}
-		 			    }
-		 			}
-		 			rcurs =0;
-		 		    }
-		 		    lcurs=0;
 		    }
+			
+			if(block[0]==null){
+			    eosl=true; 
+			    return outbatch; //changed here
+			}
+			/** Whenver a new left block came , we have to start the
+			 ** scanning of entire right table
+			 **/
+			try{
+	
+			    in = new ObjectInputStream(new FileInputStream(rfname));
+			    eosr=false; //ENABLE SCANNING OF RIGHT
+			}
+			catch(IOException io)
+			{
+			    System.err.println("BlockJoin:error in reading the file");
+			    System.exit(1);
+			}
+	
+		 }
+	
+		 while(eosr==false)
+		 {
+	
+			try{
+			    if(rcurs==0){ //changed rcurs==0 && lcurs==0
+			    	rightbatch = (Batch) in.readObject();
+			    }
+			    
+			    while(true)
+			    {
+			    	if(pcurs == block.length)
+			    	{
+			    		pcurs = 0;
+			    		lcurs = 0;
+			    		rcurs = 0;
+			    		break;
+			    	}
+			    	
+			    	leftbatch = block[pcurs];
+			    	if(leftbatch == null)
+			    	{
+			    		pcurs = 0;
+			    		lcurs = 0;
+			    		rcurs = 0;
+			    		break;
+			    	}
+			    		
+			    	 for(i=lcurs;i<leftbatch.size();i++)
+			    	 {
+			 			for(j=rcurs;j<rightbatch.size();j++)
+			 			{
+			 			    Tuple lefttuple = leftbatch.elementAt(i);
+			 			    Tuple righttuple = rightbatch.elementAt(j);
+			 			    if(lefttuple.checkJoin(righttuple,leftindex,rightindex))
+			 			    {
+				 				Tuple outtuple = lefttuple.joinWith(righttuple);
+		
+				 				//Debug.PPrint(outtuple);
+				 				//System.out.println();
+				 				outbatch.add(outtuple);
+				 				//System.out.println("added tuple");
+				 				if(outbatch.isFull())
+				 				{
+				 				    if(i==leftbatch.size()-1 && j==rightbatch.size()-1){//case 1
+					 					lcurs=0;
+					 					rcurs=0;
+					 					pcurs++;
+					 					//System.out.println("case 1");
+				 				    }else if(i!=leftbatch.size()-1 && j==rightbatch.size()-1){//case 2
+					 					lcurs = i+1;
+					 					rcurs = 0;
+					 					//System.out.println("case 2");
+				 				    }
+				 				    else if(i==leftbatch.size()-1 && j!=rightbatch.size()-1){//case 3
+					 					lcurs = i;
+					 					rcurs = j+1;
+					 					//System.out.println("case 3");
+				 				    }
+				 				    else
+				 				    {
+				 				    	lcurs = i;
+				 				    	rcurs =j+1;
+				 				    }
+				 				    return outbatch;
+				 				}
+			 			    }
+			 			}
+			 			rcurs =0;
+			    	 }
+			 		 lcurs=0;
+			 		 pcurs++;
+			    }//while true
 		   
-		}catch(EOFException e){
-		    try{
-			in.close();
-		    }catch (IOException io){
-			System.out.println("NestedJoin:Error in temporary file reading");
-		    }
-		    eosr=true;
-		}catch(ClassNotFoundException c){
-		    System.out.println("NestedJoin:Some error in deserialization ");
-		    System.exit(1);
-		}catch(IOException io){
-		    System.out.println("NestedJoin:temporary file reading error");
-		    System.exit(1);
-		}
-	    }
-	}
+			}
+			catch(EOFException e)
+			{
+			    try{
+				in.close();
+			    }catch (IOException io){
+				System.out.println("NestedJoin:Error in temporary file reading");
+			    }
+			    eosr=true;
+			}
+			catch(ClassNotFoundException c){
+			    System.out.println("NestedJoin:Some error in deserialization ");
+			    System.exit(1);
+			}
+			catch(IOException io){
+			    System.out.println("NestedJoin:temporary file reading error");
+			    System.exit(1);
+			}
+	    }//while(eosr==false)
+	}//while outbatch is full
 	return outbatch;
-    }
+ }
 
 
 
