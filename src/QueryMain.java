@@ -35,9 +35,6 @@ public class QueryMain{
 			e.printStackTrace();
 		}
 
-
-
-
 		String queryfile = args[0];
 		String resultfile = args[1];
 		FileInputStream source = null;
@@ -47,7 +44,6 @@ public class QueryMain{
 			System.out.println("File not found: "+queryfile);
 			System.exit(1);
 		}
-
 
 		/** scan the query **/
 
@@ -81,7 +77,6 @@ public class QueryMain{
 
 		if(numJoin !=0){
 			System.out.println("enter the number of buffers available");
-
 			try {
 				temp = in.readLine();
 				int numBuff = Integer.parseInt(temp);
@@ -91,8 +86,6 @@ public class QueryMain{
 			}
 		}
 
-
-
 		/** Let check the number of buffers available is enough or not **/
 
 		int numBuff = BufferManager.getBuffersPerJoin();
@@ -101,9 +94,7 @@ public class QueryMain{
 			System.exit(1);
 		}
 
-
-
-		/** This part is used When some random initial plan is required instead of comple optimized plan **/
+		/** This part is used When some random initial plan is required instead of complete optimized plan **/
 		/**
 
 	RandomInitialPlan rip = new RandomInitialPlan(sqlquery);
