@@ -96,7 +96,6 @@ public class RandomOptimizer2{
 				int neighborCost = new PlanCost().getCost(neighborPlan);
 				System.out.println("  "+neighborCost);
 				int sCost = new PlanCost().getCost(S);
-				System.out.println(neighborCost);
 				int costDifference = neighborCost - sCost;
 
 				if(costDifference <= 0)
@@ -131,6 +130,8 @@ public class RandomOptimizer2{
 			int bestCost = new PlanCost().getCost(bestPlan);
 			if(bestCost == currentBestCost)
 				countOfBestPlanNotChanging++;
+			else
+				countOfBestPlanNotChanging = 0;
 			temperature = 0.95 * temperature;
 			//System.out.println("Temperature: " + temperature);
 			//System.out.println("Count of best plan not changing: " +countOfBestPlanNotChanging);
