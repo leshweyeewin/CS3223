@@ -25,7 +25,6 @@ public class RandomOptimizer{
 	int numJoin;          // Number of joins in this query plan
 
 
-
 	/** constructor **/
 
 	public RandomOptimizer(SQLQuery sqlquery){
@@ -33,10 +32,7 @@ public class RandomOptimizer{
 	}
 
 
-
-
 	/** Randomly selects a neighbour **/
-
 
 	protected Operator getNeighbor(Operator root){
 		//Randomly select a node to be altered to get the neighbour
@@ -61,7 +57,6 @@ public class RandomOptimizer{
 	}
 
 
-
 	/** implementation of Iterative Improvement Algorithm
 	 ** for Randomized optimization of Query Plan
 	 **/
@@ -75,7 +70,6 @@ public class RandomOptimizer{
 
 		int MINCOST = Integer.MAX_VALUE;
 		Operator finalPlan = null;
-
 
 		/** NUMTER is number of times random restart **/
 
@@ -189,7 +183,6 @@ public class RandomOptimizer{
 	}
 
 
-
 	/** Applies join Commutativity for the join numbered with joinNum
 	 **  e.g.,  A X B  is changed as B X A
 	 ** returns the modifies plan
@@ -197,21 +190,27 @@ public class RandomOptimizer{
 
 	protected Operator neighborCommut(Operator root, int joinNum){
 		System.out.println("------------------neighbor by commutative---------------");
+
 		/** find the node to be altered**/
+
 		Join node = (Join) findNodeAt(root,joinNum);
 		Operator left = node.getLeft();
 		Operator right = node.getRight();
 		node.setLeft(right);
 		node.setRight(left);
+
 		/*** also flip the condition i.e.,  A X a1b1 B   = B X b1a1 A  **/
+
 		node.getCondition().flip();
 		//Schema newschem = left.getSchema().joinWith(right.getSchema());
 		// node.setSchema(newschem);
 
 		/** modify the schema before returning the root **/
+
 		modifySchema(root);
 		return root;
 	}
+
 
 	/** Applies join Associativity for the join numbered with joinNum
 	 **  e.g., (A X B) X C is changed to A X (B X C)
@@ -219,7 +218,9 @@ public class RandomOptimizer{
 	 **/
 
 	protected Operator neighborAssoc(Operator root,int joinNum){
+
 		/** find the node to be altered**/
+
 		Join op =(Join) findNodeAt(root,joinNum);
 		//Join op = (Join) joinOpList.elementAt(joinNum);
 		Operator left = op.getLeft();
@@ -245,9 +246,7 @@ public class RandomOptimizer{
 	}
 
 
-
 	/** This is given plan (A X B) X C **/
-
 
 	protected void transformLefttoRight(Join op, Join left){
 		System.out.println("------------------Left to Right neighbor--------------");
@@ -275,9 +274,11 @@ public class RandomOptimizer{
 
 		}else{
 			System.out.println("--------------------CASE 2---------------");
+
 			/**CASE 2:   ( A X a1b1 B) X a4c4  C     =  B X b1a1 (A X a4c4 C)
 			 ** a1b1,  a4c4 are the join conditions at that join operator
 			 **/
+
 			temp = new Join(leftleft,right,op.getCondition(),OpType.JOIN);
 			temp.setJoinType(op.getJoinType());
 			temp.setNodeIndex(op.getNodeIndex());
@@ -292,16 +293,17 @@ public class RandomOptimizer{
 	}
 
 	protected void transformRighttoLeft(Join op, Join right){
-
 		System.out.println("------------------Right to Left Neighbor------------------");
 		Operator left = op.getLeft();
 		Operator rightleft = right.getLeft();
 		Operator rightright = right.getRight();
 		Attribute rightAttr = (Attribute) op.getCondition().getRhs();
 		Join temp;
+
 		/** CASE 3 :  A X a1b1 (B X b4c4  C)     =  (A X a1b1 B ) X b4c4 C
 		 ** a1b1,  b4c4 are the join conditions at that join operator
 		 **/
+
 		if(rightleft.getSchema().contains(rightAttr)){
 			System.out.println("----------------------CASE 3-----------------------");
 			temp = new Join(left,rightleft,op.getCondition(),OpType.JOIN);
@@ -313,9 +315,11 @@ public class RandomOptimizer{
 			op.setNodeIndex(right.getNodeIndex());
 			op.setCondition(right.getCondition());
 		}else{
+
 			/** CASE 4 :  A X a1c1 (B X b4c4  C)     =  (A X a1c1 C ) X c4b4 B
 			 ** a1b1,  b4c4 are the join conditions at that join operator
 			 **/
+
 			System.out.println("-----------------------------CASE 4-----------------");
 			temp = new Join(left,rightright,op.getCondition(),OpType.JOIN);
 			temp.setJoinType(op.getJoinType());
@@ -404,7 +408,7 @@ public class RandomOptimizer{
 			int numbuff = BufferManager.getBuffersPerJoin();
 			switch(joinType){
 			case JoinType.NESTEDJOIN:
-				
+
 				NestedJoin nj = new NestedJoin((Join) node);
 				nj.setLeft(left);
 				nj.setRight(right);

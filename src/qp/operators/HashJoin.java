@@ -10,17 +10,17 @@ import java.lang.*;
 
 public class HashJoin extends Join{
 
-
 	int batchsize;  //Number of tuples per out batch
-	int numMatchedtuples;
+	//int numMatchedtuples;
 	int numPartitions;
 	int numTuplesHashed;
 
 	/** The following fields are useful during execution of
-	 ** the NestedJoin operation
-	 **/
+	 ** the NestedJoin operation **/
+
 	int leftindex;     // Index of the join attribute in left table
 	int rightindex;    // Index of the join attribute in right table
+
 	int pindex;     // Index of the join attribute in primary table
 	int sindex;    // Index of the join attribute in secondary table
 
@@ -28,6 +28,7 @@ public class HashJoin extends Join{
 	String lfname;    // The file name where the left table is materialize
 
 	Batch outbatch;   // Output buffer
+
 	Batch pbatch;  // Buffer for primary table
 	Batch sbatch; // Buffer for secondary table
 
@@ -36,15 +37,15 @@ public class HashJoin extends Join{
 
 	ArrayList<ArrayList<Batch>> partitions; // Temp data structure to hold partitions before writing to disk
 	Hashtable<Integer, ArrayList<Tuple>> ht; // In-memory hash table
-	ArrayList<Integer> matchedvals;
-	
+	//ArrayList<Integer> matchedvals;
+
 	int ptcurs;    // Cursor for left side buffer (inside batch, tuple index)
 	int stcurs;    // Cursor for right side buffer 
 	int pbcurs;    // Cursor for left side buffer (inside partition, batch index)
 	int sbcurs;    // Cursor for right side buffer
 	int pcurs;    // Cursor for left side buffer (partition index)
 	int hcurs;	// Cursor for hash table
-	
+
 	boolean eopp;  // End of stream (primary table) is reached
 	boolean eops;  // End of stream (secondary table)
 
@@ -99,7 +100,7 @@ public class HashJoin extends Join{
 					if(outbatch.isFull()) {
 						outbatch = new Batch(batchsize);
 						partitions.get(pindex).add(outbatch);
-​					}
+					}
 					partitions.get(pindex).get(partitions.get(pindex).size()-1).add(tuple);
 					//System.out.println(((Integer) data).intValue()+" added to Partition#"+pindex);
 				}
@@ -136,13 +137,16 @@ public class HashJoin extends Join{
 
 	public boolean open(){
 
+
 		/** select number of tuples per batch **/
+
 		int tuplesize=schema.getTupleSize();
 		batchsize=Batch.getPageSize()/tuplesize;
-		if(batchsize<=0) {
-			System.err.println("HashJoin:Integer division error, page size must be larger than tuple size");
+		if(Batch.getPageSize() < tuplesize) {
+			System.out.println("HashJoin:page size is smaller than tuple size");
 			System.exit(1);
 		}
+
 		numPartitions = numBuff;
 
 		Attribute leftattr = con.getLhs();
@@ -151,24 +155,36 @@ public class HashJoin extends Join{
 		rightindex = right.getSchema().indexOf(rightattr);
 
 		/** initialize the cursors of input buffers **/
+
 		ptcurs = 0; stcurs =0; pbcurs=0; sbcurs=0; pcurs=0; hcurs=0;
 		numleftdist=0; numrightdist=0; 
-		numMatchedtuples=0; numTuplesHashed=0;
-		eopp=false; eops=true;
+		//numMatchedtuples=0; 
+		numTuplesHashed=0;
+		eopp=false;
+
+		/** because if end of partition of secondary table is reached, 
+		 ** we have to start new partition scan
+		 **/
+		eops=true;
+
 		lhasDup=false; rhasDup=false;
-		matchedvals = new ArrayList<Integer>();
-		
-		/** Right hand side table is to be materialized
+		//matchedvals = new ArrayList<Integer>();
+
+		/** Left hand side and Right hand side table are to be materialized
 		 ** for the Hash join to perform
 		 **/
 
 		filenum++;
 		rfname = "HJtemp-R-"+ String.valueOf(filenum);
 		lfname = "HJtemp-L-"+ String.valueOf(filenum);
-		
+
 		if(!right.open()){
 			return false;
-		}else{
+		}
+		else{
+			/** Materialize the right table
+			 ** into files as partitions
+			 **/
 			if(!partition(right, rightindex, rfname))
 				return false;
 			if(!right.close())
@@ -176,7 +192,11 @@ public class HashJoin extends Join{
 		}
 		if(!left.open()){
 			return false;
-		}else{
+		}
+		else{
+			/** Materialize the left table
+			 ** into files as partitions
+			 **/
 			if(!partition(left, leftindex, lfname))
 				return false;
 			if(!left.close())
@@ -184,6 +204,11 @@ public class HashJoin extends Join{
 		}
 		//System.out.println("LHS has "+numleftdist+" values and hasDup="+lhasDup);
 		//System.out.println("RHS has "+numrightdist+" values and hasDup="+rhasDup);
+
+		/** To avoid looping through the hashed table in memory,
+		 ** pick the table with join attribute as primary key
+		 ** or the one with more distinct values as table to be hashed
+		 **/
 
 		if(numleftdist < numrightdist) {
 			primarytable = 0;
@@ -196,19 +221,20 @@ public class HashJoin extends Join{
 			primarytable = 1;
 		}
 
+		/** Update the indices
+		 **/
+
 		pindex = primarytable == 1? leftindex : rightindex;
 		sindex = primarytable == 1? rightindex : leftindex;
 
-		System.out.println((primarytable == 1? "LHS": "RHS") + " is the primary table");
+		//System.out.println((primarytable == 1? "LHS": "RHS") + " is the primary table");
 		return true;
 	}
-
 
 
 	/** from input buffers selects the tuples satisfying join condition
 	 ** And returns a page of output tuples
 	 **/
-
 
 	public Batch next(){
 		//System.out.print("HashJoin:--------------------------in next----------------");
@@ -232,8 +258,9 @@ public class HashJoin extends Join{
 				close();
 				return null;
 			}
-			
-			/* fetch new partition */
+
+			/** fetch new partition of primary table **/
+
 			if (pbcurs == 0 && eops == true && pcurs < numPartitions) {
 				try {
 					if (primarytable == 1) {
@@ -250,8 +277,14 @@ public class HashJoin extends Join{
 					System.exit(1);
 				}
 			}
+
+
+			/** hash the primary table until buffer limit is reached
+			 ** If there exist overflow pages not fit in memory,
+			 ** hash them and again compare with secondary table of the same partition
+			 * **/
+
 			if (sbcurs==0 && eopp==false) {
-				/* hash the primary table */
 				ht = new Hashtable<Integer, ArrayList<Tuple>>();
 				numTuplesHashed = 0;
 				eops = false;
@@ -305,8 +338,9 @@ public class HashJoin extends Join{
 				//System.out.println("25 is in hash table: "+ht.containsKey(new Integer(25)));
 			}
 
+			/** read secondary table, check in hash and output if matches **/
+
 			while(eops == false) {
-				/* read secondary table, hash and output if matches */
 				if (sbcurs==0 && eops==false) {
 					try {
 						if (primarytable == 1) {
@@ -321,7 +355,7 @@ public class HashJoin extends Join{
 						System.exit(1);
 					}
 				}
-				
+
 				try {
 					if (stcurs==0 && hcurs==0 && eops==false) {
 						sbatch = (Batch) sin.readObject();
@@ -343,14 +377,14 @@ public class HashJoin extends Join{
 								else {
 									outtuple = tuple.joinWith(ht.get(key).get(k));
 								}
-								
+
 								//Debug.PPrint(outtuple);
 								//System.out.println();
 								outbatch.add(outtuple);
 								//System.out.println("Matched with tuple#"+k+" of id:"+(int)ht.get(key).get(k).dataAt(pindex));
-								numMatchedtuples++;
-								matchedvals.add((Integer) tuple.dataAt(sindex));
-							
+								//numMatchedtuples++;
+								//matchedvals.add((Integer) tuple.dataAt(sindex));
+
 								if(outbatch.isFull()){
 									if(j==sbatch.size()-1 && k==matchedTuples.size()-1){//case 1
 										stcurs=0;
@@ -379,13 +413,13 @@ public class HashJoin extends Join{
 					try{
 						sin.close();
 					}catch (IOException io){
-						System.out.println("NestedJoin:Error in temporary file reading");
+						System.out.println("HashJoin:Error in temporary file reading");
 					}
 					//System.out.println("Reached end of partition of secondary table");
 					eops=true;	
 					sbcurs=0;
 					//System.out.println("eopp:"+eopp+", eops:"+eops+", pcurs:"+pcurs+", hcurs:"+hcurs+", pbcurs:"+pbcurs+", sbcurs:"+sbcurs+", ptcurs:"+ptcurs+", stcurs:"+stcurs);
-					
+
 					if(pcurs == numPartitions && eopp==true && !outbatch.isEmpty()) {
 						//System.out.println("Returning Output Batch");
 						return outbatch;
@@ -405,8 +439,8 @@ public class HashJoin extends Join{
 	}
 
 
-
 	/** Close the operator */
+	
 	public boolean close(){
 		for (int i=0; i<numPartitions; i++) {
 			File f = new File(rfname+"-"+i);

@@ -1,6 +1,7 @@
 import java.io.*;
 import java.util.*;
 import qp.utils.*;
+
 /*
   assume that the first line of the file contain the names of the
   attributes of the relation. each subsequent line represents 1
@@ -11,6 +12,7 @@ import qp.utils.*;
 public class ConvertTxtToTbl {
 
 	public static void main(String[] args) throws IOException {
+
 		// check the arguments
 		if (args.length != 1) {
 			System.out.println("usage: java ConvertTxtToTbl <tablename> \n creats <tablename>.tbl files");
@@ -22,11 +24,13 @@ public class ConvertTxtToTbl {
 
 
 		/** open the input and output streams **/
+
 		BufferedReader in = new BufferedReader(new FileReader(tblname+".txt"));
 		//ObjectOutputStream outmd = new ObjectOutputStream(new FileOutputStream(mdfile));
 		ObjectOutputStream outtbl = new ObjectOutputStream(new FileOutputStream(tblfile));
 
 		/** First Line is METADATA **/
+
 		int linenum=0;
 		String line;
 		/**
@@ -159,39 +163,3 @@ public class ConvertTxtToTbl {
 		in.close();
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

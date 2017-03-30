@@ -12,8 +12,6 @@ public class RandomDB{
 		random = new Random(System.currentTimeMillis());
 	}
 
-
-
 	/** Generates a random string of length equal to range **/
 
 	public  String randString(int range){
@@ -23,10 +21,6 @@ public class RandomDB{
 			s += (new Character((char)(97+random.nextInt(26)))).toString();
 		return s;
 	}
-
-
-
-
 
 	public static void main(String[] args){
 
@@ -43,7 +37,7 @@ public class RandomDB{
 		String statfile = args[0]+".stat";
 		int numtuple = Integer.parseInt(args[1]);
 		System.out.println("num of tuples: "+numtuple);
-		
+
 		try{
 			BufferedReader in = new BufferedReader(new FileReader(srcfile));
 			System.out.println("buffer reader initialized");
@@ -56,6 +50,7 @@ public class RandomDB{
 
 			outstat.print(numtuple);
 			outstat.println();
+
 			/** first line is <number of columns> **/
 
 			String line = in.readLine();
@@ -65,11 +60,11 @@ public class RandomDB{
 			String [] keytype = new String[numCol];
 
 			/** second line is <size of tuple = number of bytes> **/
+
 			line = in.readLine();
 			int size = Integer.parseInt(line);
 			//outstat.print(size);
 			//outstat.println();
-
 
 			/** Capture information about data types, range and primary/foreign keys**/
 			/** format is <colname><coltype><keytype><attrsize><range>  **/
@@ -84,10 +79,13 @@ public class RandomDB{
 			while((line = in.readLine()) != null){
 				StringTokenizer tokenizer = new StringTokenizer(line);
 				int tokenCount = tokenizer.countTokens();
+
 				/** get column name **/
+
 				String colname = tokenizer.nextToken();
 
 				/** get data type **/
+
 				datatype[i]= tokenizer.nextToken();
 
 				int type;
@@ -106,10 +104,11 @@ public class RandomDB{
 				}
 
 				/** range of the values allowed **/
+
 				range[i]= Integer.parseInt(tokenizer.nextToken());
 
-
 				/** key type PK/FK/NK **/
+
 				keytype[i] = tokenizer.nextToken();
 				int typeofkey;
 				if(keytype[i].equals("PK")){
@@ -165,11 +164,11 @@ public class RandomDB{
 				}
 				if(i!= numtuple-1)
 					outtbl.println();
-
 			}
 			outtbl.close();
 
 			System.out.println("end of table generation");
+
 			/** printing the number of distinct values of each column
 		in <tablename>.stat file
 			 **/
@@ -192,7 +191,6 @@ public class RandomDB{
 						else
 							outstat.print(range[i]+"\t");
 					}
-
 				}
 			}
 			outstat.close();
@@ -201,7 +199,6 @@ public class RandomDB{
 			System.out.println("error in IO "+io.getLocalizedMessage());
 			System.exit(1);
 		}
-
 	}
 
 	public int getnumdistinct(boolean[] key){

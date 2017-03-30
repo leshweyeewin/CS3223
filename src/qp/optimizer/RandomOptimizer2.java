@@ -1,6 +1,5 @@
 /** performs randomized optimization, iterative improvement algorithm **/
 
-
 package qp.optimizer;
 
 import qp.utils.*;
@@ -21,10 +20,8 @@ public class RandomOptimizer2{
 
 	public static final int NUMCHOICES = 3;
 
-
 	SQLQuery sqlquery;     // Vector of Vectors of Select + From + Where + GroupBy
 	int numJoin;          // Number of joins in this query plan
-
 
 
 	/** constructor **/
@@ -34,10 +31,7 @@ public class RandomOptimizer2{
 	}
 
 
-
-
 	/** Randomly selects a neighbour **/
-
 
 	protected Operator getNeighbor(Operator root){
 		//Randomly select a node to be altered to get the neighbour
@@ -61,9 +55,7 @@ public class RandomOptimizer2{
 		return neighbor;
 	}
 
-
-
-	/** implementation of Iterative Improvement Algorithm
+	/** implementation of Simulated Annealing Algorithm
 	 ** for Randomized optimization of Query Plan
 	 **/
 
@@ -84,7 +76,7 @@ public class RandomOptimizer2{
 		int countOfBestPlanNotChanging = 0;
 		PlanCost pc = new PlanCost();
 		int currentBestCost = new PlanCost().getCost(bestPlan);
-		
+
 		System.out.println("-----------initial Plan-------------");
 		Debug.PPrint(S0);
 		System.out.println(currentBestCost);
@@ -92,7 +84,7 @@ public class RandomOptimizer2{
 		while(!isFrozen(temperature, countOfBestPlanNotChanging))
 		{
 			System.out.println("------------------new stage--------------");
-			
+
 			currentBestCost = new PlanCost().getCost(bestPlan);
 			while(equilibrium > 0)
 			{
@@ -145,7 +137,7 @@ public class RandomOptimizer2{
 			equilibrium = getEquilibrium();
 		}
 		//modifySchema(bestPlan);
-		//System.out.println("------------------BEST COST--------------");
+		System.out.println("------------------final plan--------------");
 		int bestCost = new PlanCost().getCost(bestPlan);
 		//System.out.println(bestCost);
 		System.out.println("ACCEPTED UPHILL MOVES : " + accepted);
@@ -153,9 +145,6 @@ public class RandomOptimizer2{
 		System.out.println("  "+bestCost);
 		return bestPlan;
 	}
-
-
-
 
 	private boolean isFrozen(double temperature, int countOfBestPlanNotChanging) {
 		if(temperature < 1 && countOfBestPlanNotChanging >= 4)
@@ -166,23 +155,17 @@ public class RandomOptimizer2{
 		return false;
 	}
 
-
-
-
 	private int getInitialTemperature(Operator initialPlan) {
 		PlanCost pc = new PlanCost();
 		return 2 * pc.getCost(initialPlan);
 	}
-
-
-
 
 	private int getEquilibrium() {
 		return 16 * numJoin;
 	}
 
 
-	/** Selects a random method choice for join wiht number joinNum
+	/** Selects a random method choice for join with number joinNum
 	 **  e.g., Nested loop join, Sort-Merge Join, Hash Join etc..,
 	 ** returns the modified plan
 	 **/
@@ -191,7 +174,9 @@ public class RandomOptimizer2{
 		System.out.println("------------------neighbor by method change----------------");
 		int numJMeth = JoinType.numJoinTypes();
 		if (numJMeth > 1) {
+
 			/** find the node that is to be altered **/
+
 			Join node = (Join) findNodeAt(root,joinNum);
 			int prevJoinMeth = node.getJoinType();
 			int joinMeth = RandNumb.randInt(0,numJMeth-1);
@@ -204,7 +189,6 @@ public class RandomOptimizer2{
 	}
 
 
-
 	/** Applies join Commutativity for the join numbered with joinNum
 	 **  e.g.,  A X B  is changed as B X A
 	 ** returns the modifies plan
@@ -212,21 +196,27 @@ public class RandomOptimizer2{
 
 	protected Operator neighborCommut(Operator root, int joinNum){
 		System.out.println("------------------neighbor by commutative---------------");
+
 		/** find the node to be altered**/
+
 		Join node = (Join) findNodeAt(root,joinNum);
 		Operator left = node.getLeft();
 		Operator right = node.getRight();
 		node.setLeft(right);
 		node.setRight(left);
+
 		/*** also flip the condition i.e.,  A X a1b1 B   = B X b1a1 A  **/
+
 		node.getCondition().flip();
 		//Schema newschem = left.getSchema().joinWith(right.getSchema());
 		// node.setSchema(newschem);
 
 		/** modify the schema before returning the root **/
+
 		modifySchema(root);
 		return root;
 	}
+
 
 	/** Applies join Associativity for the join numbered with joinNum
 	 **  e.g., (A X B) X C is changed to A X (B X C)
@@ -234,7 +224,9 @@ public class RandomOptimizer2{
 	 **/
 
 	protected Operator neighborAssoc(Operator root,int joinNum){
+
 		/** find the node to be altered**/
+
 		Join op =(Join) findNodeAt(root,joinNum);
 		//Join op = (Join) joinOpList.elementAt(joinNum);
 		Operator left = op.getLeft();
@@ -255,14 +247,13 @@ public class RandomOptimizer2{
 		}
 
 		/** modify the schema before returning the root **/
+
 		modifySchema(root);
 		return root;
 	}
 
 
-
 	/** This is given plan (A X B) X C **/
-
 
 	protected void transformLefttoRight(Join op, Join left){
 		System.out.println("------------------Left to Right neighbor--------------");
@@ -290,9 +281,11 @@ public class RandomOptimizer2{
 
 		}else{
 			System.out.println("--------------------CASE 2---------------");
+
 			/**CASE 2:   ( A X a1b1 B) X a4c4  C     =  B X b1a1 (A X a4c4 C)
 			 ** a1b1,  a4c4 are the join conditions at that join operator
 			 **/
+
 			temp = new Join(leftleft,right,op.getCondition(),OpType.JOIN);
 			temp.setJoinType(op.getJoinType());
 			temp.setNodeIndex(op.getNodeIndex());
@@ -307,16 +300,17 @@ public class RandomOptimizer2{
 	}
 
 	protected void transformRighttoLeft(Join op, Join right){
-
 		System.out.println("------------------Right to Left Neighbor------------------");
 		Operator left = op.getLeft();
 		Operator rightleft = right.getLeft();
 		Operator rightright = right.getRight();
 		Attribute rightAttr = (Attribute) op.getCondition().getRhs();
 		Join temp;
+
 		/** CASE 3 :  A X a1b1 (B X b4c4  C)     =  (A X a1b1 B ) X b4c4 C
 		 ** a1b1,  b4c4 are the join conditions at that join operator
 		 **/
+
 		if(rightleft.getSchema().contains(rightAttr)){
 			System.out.println("----------------------CASE 3-----------------------");
 			temp = new Join(left,rightleft,op.getCondition(),OpType.JOIN);
@@ -328,9 +322,11 @@ public class RandomOptimizer2{
 			op.setNodeIndex(right.getNodeIndex());
 			op.setCondition(right.getCondition());
 		}else{
+
 			/** CASE 4 :  A X a1c1 (B X b4c4  C)     =  (A X a1c1 C ) X c4b4 B
 			 ** a1b1,  b4c4 are the join conditions at that join operator
 			 **/
+
 			System.out.println("-----------------------------CASE 4-----------------");
 			temp = new Join(left,rightright,op.getCondition(),OpType.JOIN);
 			temp.setJoinType(op.getJoinType());
@@ -343,12 +339,8 @@ public class RandomOptimizer2{
 			Condition newcond = right.getCondition();
 			newcond.flip();
 			op.setCondition(newcond);
-
 		}
-
-
 	}
-
 
 
 	/** This method traverses through the query plan and
@@ -379,12 +371,9 @@ public class RandomOptimizer2{
 	}
 
 
-
-
 	/** modifies the schema of operators which are modified due to selecing an alternative neighbor plan **/
+
 	private void modifySchema(Operator node){
-
-
 		if(node.getOpType()==OpType.JOIN){
 			Operator left = ((Join)node).getLeft();
 			Operator right =((Join)node).getRight();
@@ -404,14 +393,12 @@ public class RandomOptimizer2{
 	}
 
 
-
 	/** AFter finding a choice of method for each operator
 		prepare an execution plan by replacing the methods with
 		corresponding join operator implementation
 	 **/
 
 	public static Operator makeExecPlan(Operator node){
-
 		if(node.getOpType()==OpType.JOIN){
 			Operator left = makeExecPlan(((Join)node).getLeft());
 			Operator right = makeExecPlan(((Join)node).getRight());
@@ -427,7 +414,6 @@ public class RandomOptimizer2{
 				nj.setNumBuff(numbuff);
 
 				return nj;
-
 
 				/** Temporarity used simple nested join,
 	    	replace with hasjoin, if implemented **/

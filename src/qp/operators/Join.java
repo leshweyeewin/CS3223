@@ -34,8 +34,7 @@ public class Join extends Operator{
 		return numBuff;
 	}
 
-
-
+	
 	/** index of this node in query plan tree **/
 
 	public int getNodeIndex(){
@@ -47,11 +46,11 @@ public class Join extends Operator{
 
 	}
 
-
 	public int getJoinType(){
 		return jointype;
 	}
 
+	
 	/** type of join **/
 
 	public void setJoinType(int type){
@@ -96,10 +95,4 @@ public class Join extends Operator{
 		return jn;
 
 	}
-
 }
-
-
-
-
-
