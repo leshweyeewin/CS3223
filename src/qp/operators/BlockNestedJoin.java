@@ -58,11 +58,12 @@ public class BlockNestedJoin extends Join{
     /** During open finds the index of the join attributes
      **  Materializes the right hand side into a file
      **  Opens the connections
+     * @throws Exception 
      **/
 
 
 
-    public boolean open(){
+    public boolean open() throws Exception{
 
 		/** select number of tuples per batch **/
 		int tuplesize=schema.getTupleSize();

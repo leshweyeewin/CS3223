@@ -48,16 +48,18 @@ public class Select extends Operator{
 
 
     /** Opens the connection to the base operator
+     * @throws Exception 
      **/
 
-    public boolean open(){
+    public boolean open() throws Exception{
 	eos=false;     // Since the stream is just opened
 	start = 0;   // set the cursor to starting position in input buffer
 
 	/** set number of tuples per page**/
 	int tuplesize=schema.getTupleSize();
 	batchsize=Batch.getPageSize()/tuplesize;
-
+	if(batchsize == 0)
+		throw new Exception("Batchsize is 0");
 
 	if(base.open())
 	    return true;

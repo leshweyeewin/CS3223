@@ -48,14 +48,16 @@ public class Project extends Operator{
     /** Opens the connection to the base operator
      ** Also figures out what are the columns to be
      ** projected from the base operator
+     * @throws Exception 
      **/
 
-    public boolean open(){
+    public boolean open() throws Exception{
 	/** setnumber of tuples per batch **/
 	int tuplesize = schema.getTupleSize();
 	batchsize=Batch.getPageSize()/tuplesize;
 
-
+	if(batchsize == 0)
+		throw new Exception("Batchsize is 0");
 	/** The followingl loop findouts the index of the columns that
 	 ** are required from the base operator
 	 **/
