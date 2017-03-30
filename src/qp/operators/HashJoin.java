@@ -98,7 +98,7 @@ public class HashJoin extends Join{
 					outbatch = partitions.get(pindex).get(partitions.get(pindex).size()-1);
 					if(outbatch.isFull()) {
 						outbatch = new Batch(batchsize);
-						partitions.get(pindex).add(outbatch)
+						partitions.get(pindex).add(outbatch);
 ​					}
 					partitions.get(pindex).get(partitions.get(pindex).size()-1).add(tuple);
 					//System.out.println(((Integer) data).intValue()+" added to Partition#"+pindex);
