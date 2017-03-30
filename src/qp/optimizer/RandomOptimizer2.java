@@ -91,17 +91,20 @@ public class RandomOptimizer2{
 
 		while(!isFrozen(temperature, countOfBestPlanNotChanging))
 		{
+			System.out.println("------------------new stage--------------");
+			
+			currentBestCost = new PlanCost().getCost(bestPlan);
 			while(equilibrium > 0)
 			{
-				currentBestCost = new PlanCost().getCost(bestPlan);
+				System.out.println("---------------while not equilibrium--------");
 				Operator sCopy = (Operator)S.clone();
 				Operator neighborPlan = getNeighbor(sCopy);
 				System.out.println("------------------neighbor--------------");
 				Debug.PPrint(neighborPlan);
 				int neighborCost = new PlanCost().getCost(neighborPlan);
-				//System.out.println(currentBestCost);
-				int sCost = new PlanCost().getCost(S);
 				System.out.println("  "+neighborCost);
+				int sCost = new PlanCost().getCost(S);
+				System.out.println(neighborCost);
 				int costDifference = neighborCost - sCost;
 
 				if(costDifference <= 0)
@@ -132,17 +135,14 @@ public class RandomOptimizer2{
 					System.out.println(bestCost);
 				}
 				equilibrium--;
-				int bestCost = new PlanCost().getCost(bestPlan);
-				if(bestCost == currentBestCost)
-					countOfBestPlanNotChanging++;
 			}
-
+			int bestCost = new PlanCost().getCost(bestPlan);
+			if(bestCost == currentBestCost)
+				countOfBestPlanNotChanging++;
 			temperature = 0.95 * temperature;
 			//System.out.println("Temperature: " + temperature);
 			//System.out.println("Count of best plan not changing: " +countOfBestPlanNotChanging);
-			//System.out.println("------------------new best plan--------------");
-			//equilibrium = getEquilibrium();
-
+			equilibrium = getEquilibrium();
 		}
 		//modifySchema(bestPlan);
 		//System.out.println("------------------BEST COST--------------");
