@@ -139,6 +139,10 @@ public class HashJoin extends Join{
 		/** select number of tuples per batch **/
 		int tuplesize=schema.getTupleSize();
 		batchsize=Batch.getPageSize()/tuplesize;
+		if(batchsize<=0) {
+			System.err.println("HashJoin:Integer division error, page size must be larger than tuple size");
+			System.exit(1);
+		}
 		numPartitions = numBuff;
 
 		Attribute leftattr = con.getLhs();
