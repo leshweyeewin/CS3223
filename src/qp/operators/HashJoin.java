@@ -13,6 +13,8 @@ public class HashJoin extends Join{
 
 	int batchsize;  //Number of tuples per out batch
 	int numMatchedtuples;
+	int numPartitions;
+	int numTuplesHashed;
 
 	/** The following fields are useful during execution of
 	 ** the NestedJoin operation
@@ -33,7 +35,7 @@ public class HashJoin extends Join{
 	ObjectInputStream sin; // File pointer to the secondary table file
 
 	ArrayList<ArrayList<Batch>> partitions; // Temp data structure to hold partitions before writing to disk
-	Hashtable<Integer, Tuple> ht; // In-memory hash table
+	Hashtable<Integer, ArrayList<Tuple>> ht; // In-memory hash table
 	ArrayList<Integer> matchedvals;
 	
 	int ptcurs;    // Cursor for left side buffer (inside batch, tuple index)
@@ -41,7 +43,8 @@ public class HashJoin extends Join{
 	int pbcurs;    // Cursor for left side buffer (inside partition, batch index)
 	int sbcurs;    // Cursor for right side buffer
 	int pcurs;    // Cursor for left side buffer (partition index)
-
+	int hcurs;	// Cursor for hash table
+	
 	boolean eopp;  // End of stream (primary table) is reached
 	boolean eops;  // End of stream (secondary table)
 
@@ -68,7 +71,7 @@ public class HashJoin extends Join{
 
 		int pindex; // partition index
 		partitions = new ArrayList<ArrayList<Batch>>();
-		for (int i=0; i<numBuff; i++) {
+		for (int i=0; i<numPartitions; i++) {
 			partitions.add(new ArrayList<Batch>());
 		}
 
@@ -78,7 +81,7 @@ public class HashJoin extends Join{
 				Tuple tuple = inbatch.elementAt(i);
 				Object data = tuple.dataAt(index);
 				if(data instanceof Integer) {
-					pindex = ((Integer) data).intValue() % numBuff;
+					pindex = ((Integer) data).intValue() % numPartitions;
 					if(hs.contains((Integer)data)) {
 						//System.out.println("Duplicate: "+  ((Integer) data).intValue());
 						if(table == 1)
@@ -95,8 +98,8 @@ public class HashJoin extends Join{
 					outbatch = partitions.get(pindex).get(partitions.get(pindex).size()-1);
 					if(outbatch.isFull()) {
 						outbatch = new Batch(batchsize);
-						partitions.get(pindex).add(outbatch);
-					}
+						partitions.get(pindex).add(outbatch)
+​					}
 					partitions.get(pindex).get(partitions.get(pindex).size()-1).add(tuple);
 					//System.out.println(((Integer) data).intValue()+" added to Partition#"+pindex);
 				}
@@ -109,7 +112,7 @@ public class HashJoin extends Join{
 			numrightdist = hs.size();
 
 		// Write to file 
-		for (int i=0; i<numBuff; i++) {
+		for (int i=0; i<numPartitions; i++) {
 			try{
 				ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(name+"-"+i));
 				for (int j=0; j<partitions.get(i).size(); j++) {
@@ -136,6 +139,7 @@ public class HashJoin extends Join{
 		/** select number of tuples per batch **/
 		int tuplesize=schema.getTupleSize();
 		batchsize=Batch.getPageSize()/tuplesize;
+		numPartitions = numBuff;
 
 		Attribute leftattr = con.getLhs();
 		Attribute rightattr =(Attribute) con.getRhs();
@@ -143,8 +147,9 @@ public class HashJoin extends Join{
 		rightindex = right.getSchema().indexOf(rightattr);
 
 		/** initialize the cursors of input buffers **/
-		ptcurs = 0; stcurs =0; pbcurs=0; sbcurs=0; pcurs=0;
-		numleftdist=0; numrightdist=0; numMatchedtuples=0;
+		ptcurs = 0; stcurs =0; pbcurs=0; sbcurs=0; pcurs=0; hcurs=0;
+		numleftdist=0; numrightdist=0; 
+		numMatchedtuples=0; numTuplesHashed=0;
 		eopp=false; eops=true;
 		lhasDup=false; rhasDup=false;
 		matchedvals = new ArrayList<Integer>();
@@ -154,11 +159,12 @@ public class HashJoin extends Join{
 		 **/
 
 		filenum++;
-
+		rfname = "HJtemp-R-"+ String.valueOf(filenum);
+		lfname = "HJtemp-L-"+ String.valueOf(filenum);
+		
 		if(!right.open()){
 			return false;
 		}else{
-			rfname = "HJtemp-R-"+ String.valueOf(filenum);
 			if(!partition(right, rightindex, rfname))
 				return false;
 			if(!right.close())
@@ -167,7 +173,6 @@ public class HashJoin extends Join{
 		if(!left.open()){
 			return false;
 		}else{
-			lfname = "HJtemp-L-"+ String.valueOf(filenum);
 			if(!partition(left, leftindex, lfname))
 				return false;
 			if(!left.close())
@@ -176,15 +181,21 @@ public class HashJoin extends Join{
 		//System.out.println("LHS has "+numleftdist+" values and hasDup="+lhasDup);
 		//System.out.println("RHS has "+numrightdist+" values and hasDup="+rhasDup);
 
-		if (lhasDup)
+		if(numleftdist < numrightdist) {
 			primarytable = 0;
-		else 
+		} else if (numleftdist == numrightdist) {
+			if(lhasDup)
+				primarytable = 0;
+			else
+				primarytable = 1;
+		} else {
 			primarytable = 1;
+		}
 
 		pindex = primarytable == 1? leftindex : rightindex;
 		sindex = primarytable == 1? rightindex : leftindex;
 
-		//System.out.println((primarytable == 1? "LHS": "RHS") + " is the primary table");
+		System.out.println((primarytable == 1? "LHS": "RHS") + " is the primary table");
 		return true;
 	}
 
@@ -199,10 +210,10 @@ public class HashJoin extends Join{
 		//System.out.print("HashJoin:--------------------------in next----------------");
 		//Debug.PPrint(con);
 		//System.out.println();
-		int i,j;
-		if(pcurs == numBuff && eopp==true && eops==true) {
+		int i,j,k;
+		if(pcurs == numPartitions && eopp==true && eops==true) {
 			//System.out.println(numMatchedtuples+" matched!!!");
-			Collections.sort(matchedvals);
+			//Collections.sort(matchedvals);
 			//System.out.println(Arrays.toString(matchedvals.toArray()));
 			close();
 			return null;
@@ -210,8 +221,16 @@ public class HashJoin extends Join{
 
 		outbatch = new Batch(batchsize);
 		while(!outbatch.isFull()) {
+			if(pcurs == numPartitions && eopp==true && eops==true) {
+				//System.out.println(numMatchedtuples+" matched!!!");
+				//Collections.sort(matchedvals);
+				//System.out.println(Arrays.toString(matchedvals.toArray()));
+				close();
+				return null;
+			}
+			
 			/* fetch new partition */
-			if (pbcurs == 0 && eops == true && pcurs < numBuff) {
+			if (pbcurs == 0 && eops == true && pcurs < numPartitions) {
 				try {
 					if (primarytable == 1) {
 						pin = new ObjectInputStream(new FileInputStream(lfname+"-"+pcurs));
@@ -229,9 +248,10 @@ public class HashJoin extends Join{
 			}
 			if (sbcurs==0 && eopp==false) {
 				/* hash the primary table */
-				ht = new Hashtable<Integer, Tuple>();
+				ht = new Hashtable<Integer, ArrayList<Tuple>>();
+				numTuplesHashed = 0;
 				eops = false;
-				while (eopp==false && ht.size() < (numBuff-2)*batchsize) {
+				while (eopp==false && numTuplesHashed < (numBuff-2)*batchsize) {
 					try {
 						if(ptcurs==0) {
 							pbatch = (Batch) pin.readObject();
@@ -240,20 +260,29 @@ public class HashJoin extends Join{
 						}
 						for (i=ptcurs; i<pbatch.size(); i++) {
 							Tuple tuple = pbatch.elementAt(i);
-							ht.put((Integer) tuple.dataAt(pindex), tuple);
-							//System.out.println("tuple#"+i+" of id:"+(int)tuple.dataAt(pindex));
-							if (ht.size() >= (numBuff-2)*batchsize) {
+							Integer key = (Integer) tuple.dataAt(pindex);
+							if(ht.get(key) == null)
+								ht.put(key, new ArrayList<Tuple>());
+							ht.get(key).add(tuple);
+							numTuplesHashed++;
+							//System.out.println("tuple#"+i+" of id:"+(int)key);
+							if (numTuplesHashed > (numBuff-2)*batchsize) {
 								//System.out.println("Hash table size reaches memory limit");
 								break;
 							}
 						}
-						ptcurs = 0;
+						if(i>=pbatch.size()) {
+							ptcurs = 0;
+						}
+						else {
+							ptcurs = i+1;
+						}
 					}
 					catch(EOFException e) {
 						try{
 							pin.close();
 						}catch (IOException io){
-							System.out.println("NestedJoin:Error in temporary file reading");
+							System.out.println("HashJoin:Error in temporary file reading");
 						}
 						//System.out.println("Reached end of partition of primary table");
 						eopp=true;		
@@ -268,12 +297,13 @@ public class HashJoin extends Join{
 						System.exit(1);
 					}
 				}
-				//System.out.println("Hashed "+ht.size()+" tuples");
+				//System.out.println("Hashed "+numTuplesHashed+" tuples");
+				//System.out.println("25 is in hash table: "+ht.containsKey(new Integer(25)));
 			}
 
 			while(eops == false) {
 				/* read secondary table, hash and output if matches */
-				if (sbcurs==0) {
+				if (sbcurs==0 && eops==false) {
 					try {
 						if (primarytable == 1) {
 							sin = new ObjectInputStream(new FileInputStream(rfname+"-"+(pcurs-1)));
@@ -289,34 +319,54 @@ public class HashJoin extends Join{
 				}
 				
 				try {
-					if (stcurs==0 && eops==false) {
+					if (stcurs==0 && hcurs==0 && eops==false) {
 						sbatch = (Batch) sin.readObject();
+						//System.out.println("In Batch#"+sbcurs+" of size:"+sbatch.size());
 						sbcurs++;
 					}
 
 					for (j=stcurs; j<sbatch.size(); j++) {
 						Tuple tuple = sbatch.elementAt(j);
-						//System.out.println("Comparing with tuple#"+j+" of id:"+(int) tuple.dataAt(sindex));
-						if (ht.containsKey((Integer)tuple.dataAt(sindex))) {
-							Tuple outtuple = ht.get((Integer)tuple.dataAt(sindex)).joinWith(tuple);
+						Integer key = (Integer)tuple.dataAt(sindex);
+						//System.out.println("Comparing with tuple#"+j+" of id:"+(int)key);
+						if (ht.containsKey(key)) {
+							ArrayList<Tuple> matchedTuples = ht.get(key);
+							for(k=hcurs; k<matchedTuples.size(); k++) {
+								Tuple outtuple;
+								if (primarytable == 1) {
+									outtuple = ht.get(key).get(k).joinWith(tuple);
+								}
+								else {
+									outtuple = tuple.joinWith(ht.get(key).get(k));
+								}
+								
+								//Debug.PPrint(outtuple);
+								//System.out.println();
+								outbatch.add(outtuple);
+								//System.out.println("Matched with tuple#"+k+" of id:"+(int)ht.get(key).get(k).dataAt(pindex));
+								numMatchedtuples++;
+								matchedvals.add((Integer) tuple.dataAt(sindex));
 							
-							//Debug.PPrint(outtuple);
-							//System.out.println();
-							outbatch.add(outtuple);
-							//System.out.println("Matched");
-							numMatchedtuples++;
-							matchedvals.add((Integer) tuple.dataAt(sindex));
-						}
-						if(outbatch.isFull()){
-							if(j==sbatch.size()-1){ // reached end of batch
-								stcurs = 0;
+								if(outbatch.isFull()){
+									if(j==sbatch.size()-1 && k==matchedTuples.size()-1){//case 1
+										stcurs=0;
+										hcurs=0;
+									}else if(j!=sbatch.size()-1 && k==matchedTuples.size()-1){//case 2
+										stcurs = j+1;
+										hcurs = 0;
+									}else if(j==sbatch.size()-1 && k!=matchedTuples.size()-1){//case 3
+										stcurs = j;
+										hcurs = k+1;
+									}else{
+										stcurs = j;
+										hcurs = k+1;
+									}
+									//System.out.println("Returning Output Batch");
+									//System.out.println("eopp:"+eopp+", eops:"+eops+", pcurs:"+pcurs+", hcurs:"+hcurs+", pbcurs:"+pbcurs+", sbcurs:"+sbcurs+", ptcurs:"+ptcurs+", stcurs:"+stcurs);
+									return outbatch;
+								}
 							}
-							else {
-								stcurs = j+1;
-							}
-							//System.out.println("Returning Output Batch");
-							//System.out.println("eopp:"+eopp+", eops:"+eops+", pcurs:"+pcurs+", pbcurs:"+pbcurs+", ptcurs:"+ptcurs+", stcurs:"+stcurs);
-							return outbatch;
+							hcurs = 0;
 						}
 					}
 					stcurs = 0;
@@ -330,7 +380,10 @@ public class HashJoin extends Join{
 					//System.out.println("Reached end of partition of secondary table");
 					eops=true;	
 					sbcurs=0;
-					if(pcurs == numBuff && eopp==true) {
+					//System.out.println("eopp:"+eopp+", eops:"+eops+", pcurs:"+pcurs+", hcurs:"+hcurs+", pbcurs:"+pbcurs+", sbcurs:"+sbcurs+", ptcurs:"+ptcurs+", stcurs:"+stcurs);
+					
+					if(pcurs == numPartitions && eopp==true && !outbatch.isEmpty()) {
+						//System.out.println("Returning Output Batch");
 						return outbatch;
 					}
 				}
@@ -351,7 +404,7 @@ public class HashJoin extends Join{
 
 	/** Close the operator */
 	public boolean close(){
-		for (int i=0; i<numBuff; i++) {
+		for (int i=0; i<numPartitions; i++) {
 			File f = new File(rfname+"-"+i);
 			f.delete();
 			f = new File(lfname+"-"+i);
